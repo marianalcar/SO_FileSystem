@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
 
 #include "betterassert.h"
 
@@ -242,10 +244,33 @@ int tfs_unlink(char const *target) {
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
-    (void)source_path;
-    (void)dest_path;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+    int source_file = tfs_open(source_path, TFS_O_APPEND|TFS_O_CREAT|TFS_O_TRUNC);
+    int dest_file = tfs_open(dest_path, TFS_O_APPEND|TFS_O_CREAT|TFS_O_TRUNC);
+    long bytes_read;
+    if (source_file < 0 || dest_path < 0){
+        fprintf(stderr, "open error: %s\n", strerror(errno));
+        return -1;
+    }
 
-    PANIC("TODO: tfs_copy_from_external_fs");
+
+    char buffer[128];
+
+    memset(buffer,0,sizeof(buffer));
+
+   /* read the contents of the file */
+
+    while( 0 < (bytes_read = tfs_read(source_file, buffer,strlen(buffer) ))){
+        if (bytes_read < 0){
+            fprintf(stderr, "read error: %s\n", strerror(errno));
+            tfs_close(source_file);
+            tfs_close(dest_file);
+            return -1;
+        }
+        tfs_write(dest_file,buffer,strlen(buffer));
+    }
+
+    tfs_close(source_file);
+    tfs_close(dest_file);
+    return 0;
 }
+
