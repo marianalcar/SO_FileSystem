@@ -244,11 +244,15 @@ int tfs_unlink(char const *target) {
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
-    int source_file = tfs_open(source_path, TFS_O_APPEND|TFS_O_CREAT|TFS_O_TRUNC);
-    int dest_file = tfs_open(dest_path, TFS_O_APPEND|TFS_O_CREAT|TFS_O_TRUNC);
-    long bytes_read;
-    if (source_file < 0 || dest_path < 0){
+    FILE * source_file;
+    source_file = fopen(source_path, "r");
+    int dest_file = tfs_open(dest_path, TFS_O_CREAT);
+    unsigned long bytes_read;
+
+    if (source_file == NULL || dest_file < 0){
         fprintf(stderr, "open error: %s\n", strerror(errno));
+        fclose(source_file);
+        tfs_close(dest_file);
         return -1;
     }
 
@@ -259,18 +263,23 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 
    /* read the contents of the file */
 
-    while( 0 < (bytes_read = tfs_read(source_file, buffer,strlen(buffer) ))){
-        if (bytes_read < 0){
-            fprintf(stderr, "read error: %s\n", strerror(errno));
-            tfs_close(source_file);
+    while( 0 < (bytes_read = fread(buffer, 1, sizeof(buffer),source_file))){
+
+        if(tfs_write(dest_file,buffer,bytes_read) != bytes_read) {
+            fclose(source_file);
             tfs_close(dest_file);
             return -1;
         }
-        tfs_write(dest_file,buffer,strlen(buffer));
+        memset(buffer,0,sizeof(buffer));
+
+
     }
 
-    tfs_close(source_file);
-    tfs_close(dest_file);
+
+
+    if(fclose(source_file) == EOF || tfs_close(dest_file) == -1) {
+        return -1;
+    }
     return 0;
 }
 
