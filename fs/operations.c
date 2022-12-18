@@ -144,32 +144,32 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 
 int tfs_sym_link(char const *target, char const *link_name) {
     int inumber = inode_create(T_LINK);
-    inode_t* inodes = inode_get(inumber);
+    inode_t* inode_link = inode_get(inumber);
     inode_t* inode = inode_get(ROOT_DIR_INUM);
+
     if(inumber == -1) {
         return -1;
     }
-
 
     if(add_dir_entry(inode,link_name + 1,inumber) == -1) {
         return -1;
     }
 
-    strcpy(inodes -> path, target);
+    strcpy(inode_link -> path, target);
     
-
     return 0;
 }
 
 int tfs_link(char const *target, char const *link_name) {
     inode_t* inode = inode_get(ROOT_DIR_INUM);
     int inum_target = tfs_lookup(target,inode);
-    inode_t* inodee = inode_get(inum_target);
-
+    inode_t* inode_target = inode_get(inum_target);
+    
     if(inum_target < 0) {
         return -1;
     }
-    if(inodee -> i_node_type == T_LINK) {
+
+    if(inode_target -> i_node_type == T_LINK) {
         return -1;
     }
 
@@ -177,6 +177,7 @@ int tfs_link(char const *target, char const *link_name) {
         return -1;
     }
 
+    inode_target->i_count_hard++;
 
     return 0;
 }
@@ -273,11 +274,24 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 }
 
 int tfs_unlink(char const *target) {
-    (void)target;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+    inode_t* inode_dir = inode_get(ROOT_DIR_INUM);
+    int inumber = find_in_dir(inode_dir, target);
+    inode_t* inode = inode_get(inumber);
 
-    PANIC("TODO: tfs_unlink");
+    if (inode->i_node_type == T_LINK){
+        clear_dir_entry(inode_dir, target);
+        data_block_free(inode->i_data_block);
+        inode_delete(inumber);
+        return 0;
+    }
+
+    if (inode->i_count_hard == 0){
+        clear_dir_entry(inode_dir, target);
+    }
+    else{
+        inode->i_count_hard--;
+    }
+    return 0;
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
