@@ -279,7 +279,7 @@ int tfs_unlink(char const *target) {
     inode_t* inode = inode_get(inumber);
 
     if (inode->i_node_type == T_LINK){
-        clear_dir_entry(inode_dir, target);
+        clear_dir_entry(inode_dir, target+1);
         data_block_free(inode->i_data_block);
         inode_delete(inumber);
         return 0;
@@ -288,11 +288,11 @@ int tfs_unlink(char const *target) {
     inode->i_count_hard--;
 
     if (inode->i_count_hard == 0){
-        clear_dir_entry(inode_dir, target);
+        clear_dir_entry(inode_dir, target+1);
         inode_delete(inumber);
     }
     else{
-        clear_dir_entry(inode_dir, target);
+        clear_dir_entry(inode_dir, target+1);
     }
     return 0;
 }
