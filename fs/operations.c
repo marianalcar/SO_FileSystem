@@ -275,7 +275,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
 int tfs_unlink(char const *target) {
     inode_t* inode_dir = inode_get(ROOT_DIR_INUM);
-    int inumber = find_in_dir(inode_dir, target);
+    int inumber = tfs_lookup(target,inode_dir);
     inode_t* inode = inode_get(inumber);
 
     if (inode->i_node_type == T_LINK){
