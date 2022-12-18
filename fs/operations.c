@@ -285,11 +285,14 @@ int tfs_unlink(char const *target) {
         return 0;
     }
 
+    inode->i_count_hard--;
+
     if (inode->i_count_hard == 0){
         clear_dir_entry(inode_dir, target);
+        inode_delete(inumber);
     }
     else{
-        inode->i_count_hard--;
+        clear_dir_entry(inode_dir, target);
     }
     return 0;
 }
@@ -297,13 +300,17 @@ int tfs_unlink(char const *target) {
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     FILE * source_file;
     source_file = fopen(source_path, "r");
-    int dest_file = tfs_open(dest_path, TFS_O_CREAT);
-    unsigned long bytes_read;
+    int dest_file = tfs_open(dest_path, TFS_O_CREAT|TFS_O_APPEND|TFS_O_TRUNC);
+    unsigned long bytes_read = 0;
 
     if (source_file == NULL || dest_file < 0){
         fprintf(stderr, "open error: %s\n", strerror(errno));
-        fclose(source_file);
         tfs_close(dest_file);
+        return -1;
+    }
+    else if(dest_file < 0){
+        fprintf(stderr, "open error: %s\n", strerror(errno));
+        fclose(source_file);
         return -1;
     }
 
@@ -323,15 +330,11 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
         }
 
         memset(buffer,0,sizeof(buffer));
-
-
     }
-
-
-
     if(fclose(source_file) == EOF || tfs_close(dest_file) == -1) {
         return -1;
     }
+
     return 0;
 }
 
