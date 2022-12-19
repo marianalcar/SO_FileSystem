@@ -162,25 +162,31 @@ int tfs_sym_link(char const *target, char const *link_name) {
     int inumber = inode_create(T_LINK);
     inode_t* inode_link = inode_get(inumber);
     inode_t* inode = inode_get(ROOT_DIR_INUM);
+
     pthread_rwlock_wrlock(&inode_link->trinco);
     pthread_rwlock_wrlock(&inode->trinco);
 
     if(inumber == -1) {
         pthread_rwlock_unlock(&inode->trinco);
         pthread_rwlock_unlock(&inode_link->trinco);
+
         return -1;
     }
     
 
     if(add_dir_entry(inode,link_name + 1,inumber) == -1) {
+
         pthread_rwlock_unlock(&inode->trinco);
         pthread_rwlock_unlock(&inode_link->trinco);
+
         return -1;
     }
 
     strcpy(inode_link -> path, target);
+    
     pthread_rwlock_unlock(&inode->trinco);
     pthread_rwlock_unlock(&inode_link->trinco);
+
     return 0;
 }
 
