@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 /*
  * Persistent FS state
@@ -15,10 +16,12 @@
 static tfs_params fs_params;
 
 // Inode table
+
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
 
 // Data blocks
+
 static char *fs_data; // # blocks * block size
 static allocation_state_t *free_blocks;
 
@@ -223,6 +226,7 @@ int inode_create(inode_type i_type) {
 
         inode_table[inumber].i_size = BLOCK_SIZE;
         inode_table[inumber].i_data_block = b;
+        pthread_rwlock_init(&inode_table[inumber].trinco, NULL);
 
         dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
         ALWAYS_ASSERT(dir_entry != NULL,
@@ -475,6 +479,8 @@ int add_to_open_file_table(int inumber, size_t offset) {
             free_open_file_entries[i] = TAKEN;
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
+            open_file_table[i].of_offset = offset;
+            pthread_mutex_init(&open_file_table[i].mutex3,NULL);
 
             return i;
         }

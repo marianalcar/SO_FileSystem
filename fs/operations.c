@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 
 
@@ -66,12 +67,18 @@ static bool valid_pathname(char const *name) {
  */
 static int tfs_lookup(char const *name, inode_t const *root_inode) {
     // TODO: assert that root_inode is the root directory
+
+
+
     if (!valid_pathname(name)) {
+
         return -1;
     }
 
+
     // skip the initial '/' character
     name++;
+
 
     return find_in_dir(root_inode, name);
 }
@@ -83,14 +90,18 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
     }
 
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
+    pthread_rwlock_wrlock(&root_dir_inode->trinco);
+
 
     if(root_dir_inode == NULL) {
+        pthread_rwlock_unlock(&root_dir_inode->trinco);
         return -1;
     }
     int inum = tfs_lookup(name, root_dir_inode);
     size_t offset;
 
     if (inode_get(inum) -> i_node_type == T_LINK) {
+        pthread_rwlock_unlock(&root_dir_inode->trinco);
         return tfs_open(inode_get(inum) -> path,mode);
     }
 
@@ -98,6 +109,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         // The file already exists
         inode_t *inode = inode_get(inum);
         if(inode == NULL) {
+            pthread_rwlock_unlock(&root_dir_inode->trinco);
             return -1;
         }
 
@@ -119,19 +131,23 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         // Create inode
         inum = inode_create(T_FILE);
         if (inum == -1) {
+            pthread_rwlock_unlock(&root_dir_inode->trinco);
             return -1; // no space in inode table
         }
 
         // Add entry in the root directory
         if (add_dir_entry(root_dir_inode, name + 1, inum) == -1) {
             inode_delete(inum);
+            pthread_rwlock_unlock(&root_dir_inode->trinco);
             return -1; // no space in directory
         }
 
         offset = 0;
     } else {
+        pthread_rwlock_unlock(&root_dir_inode->trinco);
         return -1;
     }
+    pthread_rwlock_unlock(&root_dir_inode->trinco);
 
     // Finally, add entry to the open file table and return the corresponding
     // handle
@@ -146,17 +162,25 @@ int tfs_sym_link(char const *target, char const *link_name) {
     int inumber = inode_create(T_LINK);
     inode_t* inode_link = inode_get(inumber);
     inode_t* inode = inode_get(ROOT_DIR_INUM);
+    pthread_rwlock_wrlock(&inode_link->trinco);
+    pthread_rwlock_wrlock(&inode->trinco);
 
     if(inumber == -1) {
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_link->trinco);
         return -1;
     }
+    
 
     if(add_dir_entry(inode,link_name + 1,inumber) == -1) {
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_link->trinco);
         return -1;
     }
 
     strcpy(inode_link -> path, target);
-    
+    pthread_rwlock_unlock(&inode->trinco);
+    pthread_rwlock_unlock(&inode_link->trinco);
     return 0;
 }
 
@@ -164,20 +188,32 @@ int tfs_link(char const *target, char const *link_name) {
     inode_t* inode = inode_get(ROOT_DIR_INUM);
     int inum_target = tfs_lookup(target,inode);
     inode_t* inode_target = inode_get(inum_target);
+
+    pthread_rwlock_wrlock(&inode->trinco);
+    pthread_rwlock_wrlock(&inode_target->trinco);
     
     if(inum_target < 0) {
+        pthread_rwlock_unlock(&inode_target->trinco);
+        pthread_rwlock_unlock(&inode->trinco);
         return -1;
     }
 
     if(inode_target -> i_node_type == T_LINK) {
+        pthread_rwlock_unlock(&inode_target->trinco);
+        pthread_rwlock_unlock(&inode->trinco);
         return -1;
     }
 
+
     if(add_dir_entry(inode,link_name+1,inum_target) == -1) {
+        pthread_rwlock_unlock(&inode_target->trinco);
+        pthread_rwlock_unlock(&inode->trinco);
         return -1;
     }
 
     inode_target->i_count_hard++;
+    pthread_rwlock_unlock(&inode_target->trinco);
+    pthread_rwlock_unlock(&inode->trinco);
 
     return 0;
 }
@@ -201,7 +237,11 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
     //  From the open file table entry, we get the inode
     inode_t *inode = inode_get(file->of_inumber);
+
+    pthread_rwlock_wrlock(&inode->trinco);
+
     if (inode == NULL) {
+        pthread_rwlock_unlock(&inode->trinco);
         return -1;
     }
 
@@ -216,6 +256,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             // If empty file, allocate new block
             int bnum = data_block_alloc();
             if (bnum == -1) {
+                pthread_rwlock_unlock(&inode->trinco);
                 return -1; // no space
             }
 
@@ -224,6 +265,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
         void *block = data_block_get(inode->i_data_block);
         if(block == NULL) {
+            pthread_rwlock_unlock(&inode->trinco);
             return -1;
         }
 
@@ -236,19 +278,22 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             inode->i_size = file->of_offset;
         }
     }
-
+    pthread_rwlock_unlock(&inode->trinco);
     return (ssize_t)to_write;
 }
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
+    pthread_mutex_lock(&file -> mutex3);
     if (file == NULL) {
+        pthread_mutex_unlock(&file -> mutex3);
         return -1;
     }
 
     // From the open file table entry, we get the inode
     inode_t const *inode = inode_get(file->of_inumber);
     if(inode == NULL) {
+        pthread_mutex_unlock(&file -> mutex3);
         return -1;
     }
 
@@ -261,6 +306,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     if (to_read > 0) {
         void *block = data_block_get(inode->i_data_block);
         if(block == NULL) {
+            pthread_mutex_unlock(&file -> mutex3);
             return -1;
         }
 
@@ -269,6 +315,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         // The offset associated with the file handle is incremented accordingly
         file->of_offset += to_read;
     }
+    pthread_mutex_unlock(&file -> mutex3);
 
     return (ssize_t)to_read;
 }
@@ -277,11 +324,15 @@ int tfs_unlink(char const *target) {
     inode_t* inode_dir = inode_get(ROOT_DIR_INUM);
     int inumber = tfs_lookup(target,inode_dir);
     inode_t* inode = inode_get(inumber);
+    pthread_rwlock_wrlock(&inode_dir->trinco);
+    pthread_rwlock_wrlock(&inode->trinco);
 
     if (inode->i_node_type == T_LINK){
         clear_dir_entry(inode_dir, target+1);
-        data_block_free(inode->i_data_block);
         inode_delete(inumber);
+
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_dir->trinco);
         return 0;
     }
 
@@ -294,6 +345,8 @@ int tfs_unlink(char const *target) {
     else{
         clear_dir_entry(inode_dir, target+1);
     }
+    pthread_rwlock_unlock(&inode->trinco);
+    pthread_rwlock_unlock(&inode_dir->trinco);
     return 0;
 }
 
@@ -308,6 +361,8 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
         tfs_close(dest_file);
         return -1;
     }
+
+
     else if(dest_file < 0){
         fprintf(stderr, "open error: %s\n", strerror(errno));
         fclose(source_file);
