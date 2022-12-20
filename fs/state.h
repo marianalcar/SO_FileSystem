@@ -32,7 +32,6 @@ typedef struct {
     char path[MAX_FILE_NAME];
     pthread_rwlock_t trinco;
 
-
     // in a more complete FS, more fields could exist here
 } inode_t;
 

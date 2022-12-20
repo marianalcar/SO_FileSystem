@@ -169,11 +169,9 @@ int tfs_sym_link(char const *target, char const *link_name) {
     if(inumber == -1) {
         pthread_rwlock_unlock(&inode->trinco);
         pthread_rwlock_unlock(&inode_link->trinco);
-
         return -1;
     }
     
-
     if(add_dir_entry(inode,link_name + 1,inumber) == -1) {
 
         pthread_rwlock_unlock(&inode->trinco);
@@ -334,10 +332,10 @@ int tfs_unlink(char const *target) {
     pthread_rwlock_wrlock(&inode->trinco);
 
     if (inode->i_node_type == T_LINK){
-        pthread_rwlock_unlock(&inode->trinco);
-        pthread_rwlock_unlock(&inode_dir->trinco);
         clear_dir_entry(inode_dir, target+1);
+        pthread_rwlock_unlock(&inode->trinco);
         inode_delete(inumber);
+        pthread_rwlock_unlock(&inode_dir->trinco);
 
         return 0;
     }
@@ -345,10 +343,10 @@ int tfs_unlink(char const *target) {
     inode->i_count_hard--;
 
     if (inode->i_count_hard == 0){
-        pthread_rwlock_unlock(&inode->trinco);
-        pthread_rwlock_unlock(&inode_dir->trinco);
         clear_dir_entry(inode_dir, target+1);
+        pthread_rwlock_unlock(&inode->trinco);
         inode_delete(inumber);
+        pthread_rwlock_unlock(&inode_dir->trinco);
         return 0;
     }
     else{

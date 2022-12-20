@@ -19,17 +19,20 @@ static tfs_params fs_params;
 
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
+static pthread_mutex_t inode_thread;
 
 // Data blocks
 
 static char *fs_data; // # blocks * block size
 static allocation_state_t *free_blocks;
+static pthread_mutex_t data_thread;
 
 /*
  * Volatile FS state
  */
 static open_file_entry_t *open_file_table;
 static allocation_state_t *free_open_file_entries;
+static pthread_mutex_t files_thread;
 
 // Convenience macros
 #define INODE_TABLE_SIZE (fs_params.max_inode_count)
@@ -113,6 +116,18 @@ int state_init(tfs_params params) {
     if (!inode_table || !freeinode_ts || !fs_data || !free_blocks ||
         !open_file_table || !free_open_file_entries) {
         return -1; // allocation failed
+    }
+
+    if (pthread_mutex_init(&inode_thread,NULL) != 0){
+        return -1;
+    }
+
+    if (pthread_mutex_init(&data_thread,NULL) != 0){
+        return -1;
+    }
+
+    if (pthread_mutex_init(&files_thread,NULL) != 0){
+        return -1;
     }
 
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
@@ -242,6 +257,7 @@ int inode_create(inode_type i_type) {
         inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
         inode_table[inumber].i_count_hard = 1;
+        pthread_rwlock_init(&inode_table[inumber].trinco, NULL);
         break;
     default:
         PANIC("inode_create: unknown file type");
