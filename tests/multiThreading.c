@@ -35,10 +35,7 @@ int main() {
   pthread_t tid1[8];
   pthread_t tid2[8];
   pthread_t tid3[8];
-
-  FILE *file = fopen(source, "r");
-  fread(buffer,sizeof(char),sizeof(buffer),file);
-
+  
   assert(tfs_init(NULL) != -1);
 
 for (int aux = 0; aux < 8 ; aux++) {

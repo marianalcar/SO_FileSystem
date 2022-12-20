@@ -43,7 +43,7 @@ else
 endif
 
 # convenience variables for extending compiler options (e.g. to add sanitizers)
-CFLAGS += -fsanitize=thread
+CFLAGS += $()
 LDFLAGS += $(EXTRA_LDFLAGS)
 
 # A phony target is one that is not really the name of a file

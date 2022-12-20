@@ -340,6 +340,13 @@ int tfs_unlink(char const *target) {
     pthread_rwlock_wrlock(&inode_dir->trinco);
     pthread_rwlock_wrlock(&inode->trinco);
 
+    //shouldn't unlink if file is open
+    if (check_if_open(target) == -1){
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_dir->trinco);
+        return -1;
+    }
+
     if (inode->i_node_type == T_LINK){
         clear_dir_entry(inode_dir, target+1);
         pthread_rwlock_unlock(&inode->trinco);

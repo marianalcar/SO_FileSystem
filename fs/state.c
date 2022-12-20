@@ -562,3 +562,15 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     pthread_mutex_unlock(&files_thread);
     return &open_file_table[fhandle];
 }
+
+int check_if_open(char const *target){
+    inode_t* inode_dir = inode_get(ROOT_DIR_INUM);
+    int inumber = find_in_dir(inode_dir,target);
+    
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (open_file_table[i].of_inumber == inumber) {
+            return -1;
+        }
+    }
+    return 0;
+}
