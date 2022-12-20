@@ -13,6 +13,7 @@ int main() {
 
     int f;
 
+    //fail if path_src contains more than 1024 bytes(1 block)
     f = tfs_copy_from_external_fs(path_src, path_copied_file);
     assert(f == -1);
 

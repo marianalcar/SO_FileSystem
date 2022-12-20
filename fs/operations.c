@@ -394,6 +394,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 
         memset(buffer,0,sizeof(buffer));
     }
+    
     if(fclose(source_file) == EOF || tfs_close(dest_file) == -1) {
         return -1;
     }
