@@ -220,6 +220,7 @@ int inode_create(inode_type i_type) {
     }
 
     inode_t *inode = &inode_table[inumber];
+    pthread_mutex_lock(&inode_thread);
     insert_delay(); // simulate storage access delay (to inode)
 
     inode->i_node_type = i_type;
@@ -236,6 +237,7 @@ int inode_create(inode_type i_type) {
 
             // run regular deletion process
             inode_delete(inumber);
+            pthread_mutex_unlock(&inode_thread);
             return -1;
         }
 
@@ -263,7 +265,7 @@ int inode_create(inode_type i_type) {
         PANIC("inode_create: unknown file type");
     }
 
-
+    pthread_mutex_unlock(&inode_thread);
     return inumber;
 }
 

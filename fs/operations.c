@@ -235,6 +235,7 @@ int tfs_close(int fhandle) {
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
+    pthread_mutex_lock(&file -> mutex3);
     if (file == NULL) {
         return -1;
     }
@@ -246,6 +247,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
     if (inode == NULL) {
         pthread_rwlock_unlock(&inode->trinco);
+        pthread_mutex_unlock(&file -> mutex3);
         return -1;
     }
 
@@ -261,6 +263,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             int bnum = data_block_alloc();
             if (bnum == -1) {
                 pthread_rwlock_unlock(&inode->trinco);
+                pthread_mutex_unlock(&file -> mutex3);
                 return -1; // no space
             }
 
@@ -270,6 +273,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         void *block = data_block_get(inode->i_data_block);
         if(block == NULL) {
             pthread_rwlock_unlock(&inode->trinco);
+            pthread_mutex_unlock(&file -> mutex3);
             return -1;
         }
 
@@ -283,6 +287,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         }
     }
     pthread_rwlock_unlock(&inode->trinco);
+    pthread_mutex_unlock(&file -> mutex3);
     return (ssize_t)to_write;
 }
 
@@ -295,8 +300,10 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     }
 
     // From the open file table entry, we get the inode
-    inode_t const *inode = inode_get(file->of_inumber);
+    inode_t *inode = inode_get(file->of_inumber);
+    pthread_rwlock_wrlock(&inode->trinco);
     if(inode == NULL) {
+        pthread_rwlock_unlock(&inode->trinco);
         pthread_mutex_unlock(&file -> mutex3);
         return -1;
     }
@@ -310,6 +317,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     if (to_read > 0) {
         void *block = data_block_get(inode->i_data_block);
         if(block == NULL) {
+            pthread_rwlock_unlock(&inode->trinco);
             pthread_mutex_unlock(&file -> mutex3);
             return -1;
         }
@@ -319,6 +327,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         // The offset associated with the file handle is incremented accordingly
         file->of_offset += to_read;
     }
+    pthread_rwlock_unlock(&inode->trinco);
     pthread_mutex_unlock(&file -> mutex3);
 
     return (ssize_t)to_read;
@@ -363,7 +372,12 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     int dest_file = tfs_open(dest_path, TFS_O_CREAT|TFS_O_APPEND|TFS_O_TRUNC);
     unsigned long bytes_read = 0;
 
-    if (source_file == NULL || dest_file < 0){
+    if (source_file == NULL && dest_file < 0){
+        fprintf(stderr, "open error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    if (source_file == NULL){
         fprintf(stderr, "open error: %s\n", strerror(errno));
         tfs_close(dest_file);
         return -1;
