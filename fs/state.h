@@ -15,6 +15,7 @@
 typedef struct {
     char d_name[MAX_FILE_NAME];
     int d_inumber;
+    
 } dir_entry_t;
 
 typedef enum { T_FILE, T_DIRECTORY, T_LINK} inode_type;
