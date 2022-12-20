@@ -369,7 +369,7 @@ int tfs_unlink(char const *target) {
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     FILE * source_file;
     source_file = fopen(source_path, "r");
-    int dest_file = tfs_open(dest_path, TFS_O_CREAT|TFS_O_APPEND|TFS_O_TRUNC);
+    int dest_file = tfs_open(dest_path, TFS_O_CREAT|TFS_O_TRUNC);
     unsigned long bytes_read = 0;
 
     if (source_file == NULL){
@@ -377,14 +377,6 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
         tfs_close(dest_file);
         return -1;
     }
-
-
-    else if(dest_file < 0){
-        fprintf(stderr, "open error: %s\n", strerror(errno));
-        fclose(source_file);
-        return -1;
-    }
-
 
     char buffer[128];
 
