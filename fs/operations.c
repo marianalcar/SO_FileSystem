@@ -372,11 +372,6 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     int dest_file = tfs_open(dest_path, TFS_O_CREAT|TFS_O_APPEND|TFS_O_TRUNC);
     unsigned long bytes_read = 0;
 
-    if (source_file == NULL && dest_file < 0){
-        fprintf(stderr, "open error: %s\n", strerror(errno));
-        return -1;
-    }
-
     if (source_file == NULL){
         fprintf(stderr, "open error: %s\n", strerror(errno));
         tfs_close(dest_file);
