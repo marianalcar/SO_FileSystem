@@ -334,19 +334,22 @@ int tfs_unlink(char const *target) {
     pthread_rwlock_wrlock(&inode->trinco);
 
     if (inode->i_node_type == T_LINK){
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_dir->trinco);
         clear_dir_entry(inode_dir, target+1);
         inode_delete(inumber);
 
-        pthread_rwlock_unlock(&inode->trinco);
-        pthread_rwlock_unlock(&inode_dir->trinco);
         return 0;
     }
 
     inode->i_count_hard--;
 
     if (inode->i_count_hard == 0){
+        pthread_rwlock_unlock(&inode->trinco);
+        pthread_rwlock_unlock(&inode_dir->trinco);
         clear_dir_entry(inode_dir, target+1);
         inode_delete(inumber);
+        return 0;
     }
     else{
         clear_dir_entry(inode_dir, target+1);
